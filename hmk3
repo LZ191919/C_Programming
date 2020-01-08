@@ -1,0 +1,452 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+
+enum MyEnum
+{
+	EXAM = 'E',REVIWE = 'R',QUIT = 'Q'
+};
+
+struct   formulas
+{
+	char* exam_file;
+	signed int a;
+	char operators;
+	signed int b;
+	float user_answer;
+	float correct_answer;
+	struct formulas* Next_formulas;
+};
+
+typedef struct formulas  Node;
+typedef Node* Link;
+
+Link parase_exam_papar(FILE* fp, Link Head);
+void free_Node(Link);
+void Exam_Process(Link Head,char *);
+void review(void);
+void del_Enter(char*,int);
+int  main(int argc, char** argv)
+{
+	char choice[10];
+	char buf[100];
+	char exam_file[100];
+	char *name =NULL;
+	name = (char*)malloc(100);
+	if (name == NULL)
+	{
+		return 0;
+	}
+	memset(exam_file, 0, sizeof(exam_file));
+	exam_file[0] = '.';
+	exam_file[1] = '/';
+	memset(buf,0,sizeof(buf));
+	memset(name, 0,100);
+	memset(choice,0,sizeof(choice));
+	printf("PATH %s\n",argv[0]);
+	if (argv[1] == 0)
+	{
+		//防止用户运行exam.exe不输入参数，考生姓名提示用户输入
+		printf("please enter your name\n");
+		gets_s(name, 100);
+		printf(":)hello %s, welcome to the exam\n", name);
+	}
+	else
+	{
+		//如果用户运行exam.exe时输入了参数，姓名的来源就为命令行参数
+		int offset = 0;
+		int i = 1;
+		while (argv[i] != NULL)
+		{
+			strcat(name, argv[i]);
+			offset = offset+sizeof(argv[i]);
+			i++;
+		}
+		
+		printf(":)hello %s, welcome to the exam\n", name);
+	}
+
+	while(1)
+	{
+		//生成一堆对话界面,请用户输入操作
+		printf("@@@@@@@@@@@@@@ Main Menu @@@@@@@@@@@@@@@@@@\n");
+		printf("E: take an exam\n");
+		printf("R: reviwe your answer of an exam\n");
+		printf("Q: quit\n");
+		printf("please enter your choice\n");
+		memset(choice,0,10);
+		//等待用户输入
+		while (choice[0] == 0)
+		{
+			gets_s(choice, 10);
+		}
+		switch (choice[0])
+		{
+			//如果是考试
+			case 'E':
+			case 'e':
+			{
+				printf("Please tell me the name of the exam file\n");
+				gets_s(&(exam_file[2]), 90);
+				FILE* fd = NULL;
+				fd = fopen(exam_file, "r");
+				if(fd == NULL)
+				{
+					printf("open %s failure\n",exam_file);
+					continue;
+				}
+				//创建考题的链表
+				Link Head = NULL;
+				Head = parase_exam_papar(fd, Head);
+
+				if (Head == NULL)
+				{
+					//创建链表失败
+					continue;
+				}
+				Head->exam_file = exam_file;
+
+				Exam_Process(Head, name);
+
+				fclose(fd);
+			}break;
+
+			//如果是回顾答案
+			case 'R':
+			case 'r':
+			{
+				review();
+				
+			}break;
+			//如果是退出
+			case 'Q':
+			case 'q':
+			{
+				//quit 直接return
+				if (argv[1] == 0)
+				{
+					printf("%s good bye",name);
+				}
+				else
+				{
+					printf("%s good bye",argv[1]);
+				}
+				return 0;
+
+			}break;
+			default:
+				break;
+
+		}
+	}
+
+}
+
+
+
+
+Link parase_exam_papar(FILE* fp, Link Head)
+{
+	Link pointor = NULL;
+	char buf[10];
+	Head = (Link)malloc(sizeof(Node));
+	memset(Head,0,sizeof(Node));
+
+	if (Head == NULL)
+	{
+		printf("malloc failure\n");
+		return NULL;
+	}
+	//读取第一行exam字符串
+	if (fgets(buf, 10, fp) == NULL)
+	{
+		printf("read file failure\n");
+	}
+	pointor = Head;
+	while (1)
+	{
+		fscanf_s(fp, "%d", &(pointor->a), sizeof(signed int));
+		fscanf_s(fp, "%c", &(pointor->operators), sizeof(char));
+		fscanf_s(fp, "%d", &(pointor->b), sizeof(signed int));
+		
+		switch (pointor->operators)
+		{
+			case 43:
+				pointor->correct_answer = pointor->a + pointor->b; break;
+			case 45:
+				pointor->correct_answer = pointor->a - pointor->b; break;
+			case 42:
+				pointor->correct_answer = pointor->a * pointor->b; break;
+			case 47:
+				pointor->correct_answer = float(pointor->a) / float(pointor->b); break;
+			default :
+				break;
+		}
+
+		
+		//如果读到了文件末尾，函数返回
+		if (feof(fp) == 1)
+		{
+			return Head;
+		}
+		Link New;
+		New = (Link)malloc(sizeof(Node));
+		memset(New,0,sizeof(Node));
+		if (New == NULL)
+		{
+			printf("malloc failure\n");
+			free_Node(Head);
+			return NULL;
+		}
+		pointor->Next_formulas = New;
+		pointor = New;
+	}
+}
+
+
+
+void free_Node(Link Head)
+{
+	Link pointor;
+
+	pointor = Head;
+
+
+	while (Head != NULL)
+	{
+		pointor = Head;
+		Head = Head->Next_formulas;
+		free(pointor);
+	}
+
+}
+
+void Exam_Process(Link Head,char *name)
+
+{
+	int correct_count=0, total_count = 0;
+	FILE* fd1 = NULL;
+	Link Pointor=NULL;
+	char answer_file_path[100];
+	char Save_or_Not = 0;
+	Pointor = Head;
+	memset(answer_file_path,0,sizeof(answer_file_path));
+	answer_file_path[0] = '.';
+	answer_file_path[1] = '/';
+	printf("Exam started\n");
+
+	while (Pointor != NULL)
+	{
+		printf(":)%d %c %d = ?\n", Pointor->a, Pointor->operators, Pointor->b);
+		scanf_s("%f",&(Pointor->user_answer));
+		Pointor = Pointor->Next_formulas;		
+	}
+
+	Pointor = Head;
+	printf("............exam ends.................\n");
+	printf(":) name here is the result of the exam\n");
+	printf("............exam results..............\n");
+	printf("exam file：exam1.txt\n");
+	printf("student name: %s\n",name);
+	
+	//创建一个存答卷的文件
+	//fd1 = fopen("./answer1.txt", "w");
+	//if (fd1 == NULL)
+	//{
+	//	printf("creat answer paper failure\n");
+	//	return;
+	//}
+	//fprintf(fd1, "student name: %s\n", name);
+	while (Pointor != NULL)
+	{
+		total_count++;
+		if (fabs(Pointor->correct_answer - Pointor->user_answer) < 0.000001)
+		{
+			printf("%d) Q: %d %c %d  A:%f  Correct\n",total_count,Pointor->a,Pointor->operators,Pointor->b,Pointor->user_answer);
+			//fprintf(fd1, "%d) Q: %d %c %d  A:%f  Correct\n", total_count, Pointor->a, Pointor->operators, Pointor->b, Pointor->user_answer);
+			correct_count++;
+		}
+		else
+		{
+			printf("%d) Q: %d %c %d  A:%d  Wrong\n", total_count, Pointor->a, Pointor->operators, Pointor->b, Pointor->user_answer);
+			//fprintf(fd1, "%d) Q: %d %c %d  A:%d  Wrong\n", total_count, Pointor->a, Pointor->operators, Pointor->b, Pointor->user_answer);
+		}
+		Pointor = Pointor->Next_formulas;
+	}
+	Pointor = Head;
+	printf("%d of %d answers are correct\n",correct_count,total_count);
+	//fprintf(fd1, "%d of %d answers are correct", correct_count, total_count);
+	printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+	printf("Do you want to save your exam record(Y/N)\n");
+	while ((Save_or_Not == 0) || (Save_or_Not == '\n'))
+	{
+		scanf_s("%c", &Save_or_Not);
+	}
+	if ((Save_or_Not == 'y') || (Save_or_Not == 'Y'))
+	{
+
+		//创建一个存答卷的文件
+		printf("please enter the file name of the file.\n");
+		getchar();
+		gets_s(&(answer_file_path[2]), 90);
+
+		fd1 = fopen(answer_file_path, "w");
+		if (fd1 == NULL)
+		{
+			printf("creat answer paper failure\n");
+			return;
+		}
+		fprintf(fd1, "answer of\n");
+		fprintf(fd1, "%s\n",(Head->exam_file + 2));
+		fprintf(fd1, "%s\n",name);
+		while (Pointor != NULL)
+		{
+			fprintf(fd1, "%f\n",Pointor->user_answer);
+			Pointor = Pointor->Next_formulas;
+		}
+
+		printf("Answer are saved to %s ,and you can reviwe it\n",answer_file_path);
+	}
+	else
+	{
+		return;
+	}
+	fclose(fd1);
+	free_Node(Head);
+
+}
+
+
+void review()
+{
+	int total_count = 0;
+	int correct_count = 0;
+
+	char review_file[100];
+	char exam_file[100];
+	char buf[100];
+	char name[100];
+	FILE* fd2 = NULL; //review file 
+	FILE* fd3 = NULL; //exam file 
+	Link pointor = NULL;
+	Link Head = NULL;
+	Head = (Link)malloc(sizeof(Node));
+
+
+	memset(review_file,0,sizeof(review_file));
+	memset(exam_file,0,sizeof(exam_file));
+	memset(buf, 0, sizeof(buf));
+	memset(name, 0, sizeof(name));
+	review_file[0] = '.';
+	review_file[1] = '/';
+	exam_file[0] = '.';
+	exam_file[1] = '/';
+
+	printf("please tell me the name of the answer file to reviwe:\n");
+	gets_s(&(review_file[2]), 90);
+	
+	fd2 = fopen(review_file,"r");
+
+	if (fd2 == NULL)
+	{
+		printf("open file failure\n");
+		return;
+	}
+	fgets(buf, 100, fd2);
+
+	fgets(&exam_file[2],98,fd2);
+	//删除路径中的回车键
+	del_Enter(exam_file,sizeof(exam_file));
+	
+	fgets(name, 100, fd2);
+	del_Enter(name,sizeof(name));
+	printf("%s, here is the result of the exam\n",name);
+	fd3 = fopen(exam_file,"r");
+	if (fd3 == NULL)
+	{
+		printf("open file failure\n");
+		return;
+
+	}
+	fgets(buf, 100, fd3);
+	pointor = Head;
+	while (1)
+	{
+		fscanf_s(fd3, "%d", &(pointor->a), sizeof(signed int));
+		fscanf_s(fd3, "%c", &(pointor->operators), sizeof(char));
+		fscanf_s(fd3, "%d", &(pointor->b), sizeof(signed int));
+		fscanf_s(fd2,"%f",&(pointor->user_answer),sizeof(float));
+		switch (pointor->operators)
+		{
+		case 43:
+			pointor->correct_answer = pointor->a + pointor->b; break;
+		case 45:
+			pointor->correct_answer = pointor->a - pointor->b; break;
+		case 42:
+			pointor->correct_answer = pointor->a * pointor->b; break;
+		case 47:
+			pointor->correct_answer = float(pointor->a) / float(pointor->b); break;
+		default:
+			break;
+		}
+
+		//如果读到了文件末尾，函数返回
+		if ((feof(fd3) == 1)||(feof(fd2) == 1))
+		{
+			break;
+		}
+		Link New;
+		New = (Link)malloc(sizeof(Node));
+		memset(New, 0, sizeof(Node));
+		if (New == NULL)
+		{
+			printf("malloc failure\n");
+			free_Node(Head);
+			return;
+		}
+		pointor->Next_formulas = New;
+		pointor = New;
+	}
+
+	pointor = Head;
+	while (pointor != NULL)
+	{
+		total_count++;
+		if (fabs(pointor->correct_answer - pointor->user_answer) < 0.000001)
+		{
+			printf("%d) Q: %d %c %d  A:%f  Correct\n", total_count, pointor->a, pointor->operators, pointor->b, pointor->user_answer);
+			correct_count++;
+		}
+		else
+		{
+			printf("%d) Q: %d %c %d  A:%f  Wrong!!!! the right answer is %f\n", total_count, pointor->a, pointor->operators, pointor->b, pointor->user_answer,pointor->correct_answer);
+		}
+		pointor = pointor->Next_formulas;
+	}
+	printf("%d of %d answers are correct\n", correct_count, total_count);
+
+
+	free_Node(Head);
+
+
+	fclose(fd2);
+	fclose(fd3);
+
+}
+
+
+void del_Enter(char *stream,int cnt)
+{
+	for (int i = 0; i < cnt; i++)
+	{
+		if (stream[i] == '\n')
+		{
+			stream[i] = 0;
+		}
+	}
+
+
+}
